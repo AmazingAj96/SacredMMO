@@ -54,6 +54,8 @@ app.get('/sync', async (req, res) => {
     res.status(500).json({ status: 'error', message: 'Failed to fetch logs' });
   }
 });
+  }
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
