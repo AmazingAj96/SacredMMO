@@ -36,6 +36,9 @@ app.post('/sync', (req, res) => {
 app.get('/', (req, res) => {
   res.send('Sacred MMO Live Sync Server Running!');
 });
+app.get('/sync', (req, res) => {
+  res.send('Sync endpoint is alive!');
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
