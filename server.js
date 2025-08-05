@@ -36,8 +36,23 @@ app.post('/sync', (req, res) => {
 app.get('/', (req, res) => {
   res.send('Sacred MMO Live Sync Server Running!');
 });
-app.get('/sync', (req, res) => {
-  res.send('Sync endpoint is alive!');
+
+app.get('/sync', async (req, res) => {
+  try {
+    const snapshot = await db.ref('gameLogs').once('value');
+    const logs = snapshot.val() || {};
+
+    // Convert object to array of logs
+    const logArray = Object.entries(logs).map(([id, log]) => ({
+      id,
+      ...log
+    }));
+
+    res.json({ status: 'success', logs: logArray });
+  } catch (err) {
+    console.error('Error fetching logs:', err);
+    res.status(500).json({ status: 'error', message: 'Failed to fetch logs' });
+  }
 });
 
 const PORT = process.env.PORT || 3000;
