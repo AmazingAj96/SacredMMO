@@ -1,21 +1,18 @@
-const express = require('express');
-const bodyParser = require('body-parser');
-const cors = require('cors');
 const admin = require('firebase-admin');
-const firebaseConfig = require('./firebaseConfig');
+const serviceAccount = require('./serviceAccountKey.json');
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  databaseURL: "https://sacredsystemmmo-default-rtdb.firebaseio.com"
+});
+
+const db = admin.database();
 
 const app = express();
 app.use(bodyParser.json());
 app.use(cors());
 
-// Initialize Firebase Admin
-try {
-  admin.initializeApp({
-    credential: admin.credential.applicationDefault(),
-    databaseURL: firebaseConfig.databaseURL
-  });
-} catch (e) {
-  console.log('Firebase Admin already initialized');
+
 }
 
 const db = admin.database();
