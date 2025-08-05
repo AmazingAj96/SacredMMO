@@ -1,6 +1,10 @@
 const admin = require('firebase-admin');
 const serviceAccount = require('./serviceAccountKey.json');
+const express = require('express');
+const bodyParser = require('body-parser');
+const cors = require('cors');
 
+// Initialize Firebase
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
   databaseURL: "https://sacredsystemmmo-default-rtdb.firebaseio.com"
@@ -8,35 +12,27 @@ admin.initializeApp({
 
 const db = admin.database();
 
+// Initialize Express
 const app = express();
 app.use(bodyParser.json());
 app.use(cors());
 
-
-}
-
-const db = admin.database();
-
+// API endpoint
 app.post('/sync', (req, res) => {
   const { player, action, timestamp } = req.body;
+
   if (!player || !action) {
     return res.status(400).json({ error: 'Missing player or action' });
   }
 
-  const logRef = db.ref('gameLogs').push();
-  logRef.set({ player, action, timestamp: timestamp || new Date().toISOString() });
+  // Save to Firebase
+  db.ref('syncLogs').push({ player, action, timestamp: timestamp || Date.now() });
 
-  console.log(`Synced: ${player} -> ${action}`);
-  res.json({ status: 'success' });
+  res.status(200).json({ success: true });
 });
 
-app.get('/', (req, res) => {
-  res.send('Sacred MMO Live Sync Server Running!');
+// Start server
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
-
-app.get('/sync', async (req, res) => {
-  res.json({ status: 'success', logs: ['test log 1', 'test log 2'] });
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
