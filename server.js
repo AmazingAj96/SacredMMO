@@ -1,47 +1,68 @@
+// =========================
+// SacredMMO Cloud Server.js
+// =========================
+
 const express = require('express');
+const bodyParser = require('body-parser');
+const cors = require('cors');
 const admin = require('firebase-admin');
+
 const app = express();
+app.use(cors());
+app.use(bodyParser.json());
 
-app.use(express.json()); // ✅ Enable JSON parsing for POST requests
+console.log("🚀 Sacred MMO Server starting...");
 
-// Initialize Firebase Admin with the correct key filename
-const serviceAccount = require('./serviceAccountKey.json');
+// -------------------------
+// Firebase Admin Setup
+// -------------------------
+const serviceAccount = JSON.parse(process.env.FIREBASE_KEY); 
+// <-- Stored as secret in Render
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  databaseURL: "https://sacredsystemmmo.firebaseio.com" // ✅ Update if needed
 });
 
-const db = admin.database();
+const db = admin.firestore();
 
-// POST route for syncing Sacred Logs
-app.post('/sync', (req, res) => {
-  const { player, action, timestamp } = req.body;
+// -------------------------
+// Sync Endpoint
+// -------------------------
+app.post('/sync', async (req, res) => {
+  const { player, action, type, timestamp } = req.body;
+  console.log("🔥 Sacred MMO Event:", req.body);
 
-  if (!player || !action) {
-    return res.status(400).json({ error: 'Missing player or action' });
+  try {
+    // Save the event to Firestore
+    const event = {
+      player,
+      action,
+      type: type || "event",
+      timestamp: timestamp || Date.now(),
+      syncedAt: new Date().toISOString()
+    };
+
+    await db.collection('sacredEvents').add(event);
+
+    res.json({
+      success: true,
+      message: 'Sync stored in Firebase 🔥',
+      event
+    });
+
+  } catch (err) {
+    console.error("Firebase Error:", err);
+    res.status(500).json({
+      success: false,
+      error: 'Firebase write failed ❌'
+    });
   }
-
-  // Save to Firebase
-  db.ref('syncLogs').push({ player, action, timestamp });
-
-  console.log('Incoming Sync:', req.body);
-
-  res.status(200).json({ 
-    success: true, 
-    message: 'Sync received 🔮',
-    timestamp: new Date().toISOString()
-  });
 });
 
-// Start server
-const PORT = process.env.PORT || 10000;
-
-// ✅ Fix for "Cannot GET /"
-app.get('/', (req, res) => {
-  res.send('🔥 Sacred MMO Server is LIVE 🔥');
-});
-
+// -------------------------
+// Server Start
+// -------------------------
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🌐 Sacred MMO Cloud Server running on port ${PORT}`);
 });
