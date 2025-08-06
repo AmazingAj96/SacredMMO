@@ -4,15 +4,13 @@ import admin from "firebase-admin";
 const app = express();
 app.use(express.json());
 
-// Load the Base64 environment variable and decode it
-if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY_B64) {
-  console.error("❌ Missing FIREBASE_SERVICE_ACCOUNT_KEY_B64 environment variable");
-}
-const serviceAccount = JSON.parse(
-  Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY_B64, "base64").toString("utf8")
-);
+// Decode Base64 JSON key
+const rawKey = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY_B64, "base64").toString("utf8");
+const serviceAccount = JSON.parse(rawKey);
 
-// Initialize Firebase Admin
+// FIX the private key formatting
+serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
   databaseURL: "https://sacredsystemmmo-default-rtdb.firebaseio.com"
@@ -20,7 +18,7 @@ admin.initializeApp({
 
 const db = admin.database();
 
-// 🔹 Sync endpoint
+// Endpoint to sync data
 app.post("/sync", async (req, res) => {
   try {
     const { player, action, type } = req.body;
@@ -37,13 +35,6 @@ app.post("/sync", async (req, res) => {
     console.error("Error syncing:", error);
     res.status(500).json({ status: "error", error: error.message });
   }
-});
-
-// 🔹 Debug route to confirm environment variable is working
-app.get("/debug-env", (req, res) => {
-  const key = process.env.FIREBASE_SERVICE_ACCOUNT_KEY_B64;
-  if (!key) return res.status(500).send("❌ Env variable not found!");
-  res.send(`✅ Env variable loaded! Length: ${key.length} characters`);
 });
 
 const PORT = process.env.PORT || 3000;
