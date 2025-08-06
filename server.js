@@ -2,40 +2,36 @@ import express from "express";
 import admin from "firebase-admin";
 
 const app = express();
-app.use(express.json()); // ✅ Required for JSON POST
+app.use(express.json()); // ✅ This ensures req.body is an object
 
 // Load JSON key from environment variable
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  databaseURL: "https://sacredsystemmmo-default-rtdb.firebaseio.com"
+  databaseURL: "https://sacredsystemmmo-default-rtdb.firebaseio.com",
 });
 
-const db = admin.database();
+const db = admin.database(); // ✅ Realtime Database
 
-// ✅ TEST endpoint
+// ✅ Cloud Sync Endpoint
 app.post("/sync", async (req, res) => {
   try {
-    // Log the request to check it arrives correctly
-    console.log("Incoming JSON:", req.body);
+    const { player, action, type } = req.body;
 
-    const { player, action, sacredLogs } = req.body;
-
-    // 🔹 Validate required fields
-    if (!player || !action || !sacredLogs || !sacredLogs.type) {
-      return res.status(400).json({ 
-        status: "error", 
-        error: "Missing required fields in body"
+    // ✅ Check for missing values to avoid push errors
+    if (!player || !action || !type) {
+      return res.status(400).json({
+        status: "error",
+        error: "Missing player, action, or type in request body",
       });
     }
 
-    // ✅ Push to Realtime DB
     await db.ref("sacredLogs").push({
       player,
       action,
-      ...sacredLogs,
-      timestamp: Date.now()
+      type,
+      timestamp: Date.now(),
     });
 
     res.json({ status: "ok", message: "Synced to Realtime Database!" });
