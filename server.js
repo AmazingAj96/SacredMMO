@@ -1,18 +1,14 @@
 import express from "express";
-import fetch from "node-fetch";
 import admin from "firebase-admin";
 
 const app = express();
 app.use(express.json());
 
-// 1️⃣ Decode Base64 Firebase Service Account Key from environment variable
-const rawKey = Buffer.from(
-  process.env.FIREBASE_SERVICE_ACCOUNT_KEY_B64,
-  "base64"
-).toString("utf8");
+// Decode Base64 JSON key
+const rawKey = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY_B64, "base64").toString("utf8");
 const serviceAccount = JSON.parse(rawKey);
 
-// Fix private key formatting
+// FIX the private key formatting
 serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
 
 admin.initializeApp({
@@ -22,36 +18,19 @@ admin.initializeApp({
 
 const db = admin.database();
 
-// Optional: Auto Relay URL for MMO events
-const RELAY_URL = process.env.RELAY_URL || "https://sacredmmo.onrender.com/echo"; 
-
-// 2️⃣ Sync endpoint
+// Endpoint to sync data
 app.post("/sync", async (req, res) => {
   try {
     const { player, action, type } = req.body;
 
-    // 3️⃣ Log to Firebase Realtime DB
-    const logEntry = {
-      player: player || "Unknown",
-      action: action || "No Action",
-      type: type || "General",
+    await db.ref("sacredLogs").push({
+      player,
+      action,
+      type,
       timestamp: Date.now(),
-    };
+    });
 
-    await db.ref("sacredLogs").push(logEntry);
-
-    // 4️⃣ Optional: Auto relay to MMO endpoint
-    try {
-      await fetch(RELAY_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(logEntry),
-      });
-    } catch (relayError) {
-      console.warn("Relay failed (but Firebase logged successfully):", relayError.message);
-    }
-
-    res.json({ status: "ok", message: "Synced to Firebase & relayed!" });
+    res.json({ status: "ok", message: "Synced to Realtime Database!" });
   } catch (error) {
     console.error("Error syncing:", error);
     res.status(500).json({ status: "error", error: error.message });
