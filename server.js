@@ -1,68 +1,73 @@
 import express from "express";
-import cors from "cors";
+import admin from "firebase-admin";
 
 const app = express();
-const PORT = process.env.PORT || 10000;
+app.use(express.json());
 
-app.use(cors());
-app.use(express.json({ limit: "1mb" })); // Safe JSON parsing
+// 🔹 Decode Base64 JSON key
+const rawKey = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY_B64, "base64").toString("utf8");
+const serviceAccount = JSON.parse(rawKey);
 
-// Health check
-app.get("/", (req, res) => {
-  res.send("🔥 Sacred MMO Server is ALIVE 🔥");
+// 🔹 Fix private key formatting
+serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  databaseURL: "https://sacredsystemmmo-default-rtdb.firebaseio.com"
 });
 
-// Core MMO Sync
-app.post("/sync", (req, res) => {
+const db = admin.database();
+
+// ==========================================
+// 🔹 1. Original /sync endpoint (works)
+// ==========================================
+app.post("/sync", async (req, res) => {
   try {
-    console.log("Incoming raw body:", req.body);
+    const { player, action, type } = req.body;
 
-    // Decode if needed
-    let data = req.body;
-    if (typeof data === "string") {
-      try {
-        data = JSON.parse(data);
-      } catch (err) {
-        console.error("JSON parse error:", err.message);
-        return res.status(400).json({ 
-          status: "error", 
-          message: "Invalid JSON format", 
-          raw: req.body 
-        });
-      }
-    }
-
-    const { player, action, type, realm } = data;
-
-    if (!player || !action || !type || !realm) {
-      console.error("Missing fields:", data);
-      return res.status(400).json({ 
-        status: "error", 
-        message: "Missing required fields", 
-        received: data 
-      });
-    }
-
-    // Sacred MMO log
-    console.log("Sacred Log Received:", data);
-
-    // ✅ Always respond to avoid timeout
-    return res.status(200).json({
-      status: "success",
-      message: "Sacred log received",
-      received: data
+    await db.ref("sacredLogs").push({
+      player,
+      action,
+      type,
+      timestamp: Date.now(),
     });
 
-  } catch (err) {
-    console.error("Server error:", err);
-    return res.status(500).json({
-      status: "error",
-      message: "Internal server crash prevented",
-      details: err.message
-    });
+    res.json({ status: "ok", message: "Synced to Realtime Database!" });
+  } catch (error) {
+    console.error("Error syncing:", error);
+    res.status(500).json({ status: "error", error: error.message });
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`🔥 Sacred MMO Server running on ${PORT} 🔥`);
+// ==========================================
+// 🔹 2. New /relay endpoint for MMO events
+// ==========================================
+app.post("/relay", async (req, res) => {
+  try {
+    const { message } = req.body; // e.g. "*joins Rick and Morty in Cloud Nine*"
+    if (!message) return res.status(400).json({ status: "error", error: "Missing message" });
+
+    const event = {
+      player: "Aj",
+      action: message,
+      type: "mmo_event",
+      timestamp: Date.now(),
+    };
+
+    await db.ref("sacredLogs").push(event);
+
+    console.log("🔥 ChatGPT MMO Event synced:", event);
+    res.json({ status: "ok", message: "Event relayed to Firebase!" });
+  } catch (error) {
+    console.error("Relay error:", error);
+    res.status(500).json({ status: "error", error: error.message });
+  }
 });
+
+// ==========================================
+// 🔹 Start the server
+// ==========================================
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () =>
+  console.log(`🔥 Sacred MMO Cloud running on ${PORT}`)
+);
