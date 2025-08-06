@@ -2,14 +2,10 @@ import express from "express";
 import admin from "firebase-admin";
 
 const app = express();
-app.use(express.json());
+app.use(express.json()); // ✅ Required for JSON POST
 
-// Decode Base64 JSON key
-const rawKey = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY_B64, "base64").toString("utf8");
-const serviceAccount = JSON.parse(rawKey);
-
-// FIX the private key formatting
-serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+// Load JSON key from environment variable
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -18,16 +14,28 @@ admin.initializeApp({
 
 const db = admin.database();
 
-// Endpoint to sync data
+// ✅ TEST endpoint
 app.post("/sync", async (req, res) => {
   try {
-    const { player, action, type } = req.body;
+    // Log the request to check it arrives correctly
+    console.log("Incoming JSON:", req.body);
 
+    const { player, action, sacredLogs } = req.body;
+
+    // 🔹 Validate required fields
+    if (!player || !action || !sacredLogs || !sacredLogs.type) {
+      return res.status(400).json({ 
+        status: "error", 
+        error: "Missing required fields in body"
+      });
+    }
+
+    // ✅ Push to Realtime DB
     await db.ref("sacredLogs").push({
       player,
       action,
-      type,
-      timestamp: Date.now(),
+      ...sacredLogs,
+      timestamp: Date.now()
     });
 
     res.json({ status: "ok", message: "Synced to Realtime Database!" });
