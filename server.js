@@ -1,69 +1,55 @@
 import express from "express";
+import cors from "cors";
 import bodyParser from "body-parser";
-import fetch from "node-fetch";
+import admin from "firebase-admin";
 
+// ✅ Initialize Firebase Admin
+import serviceAccount from "./serviceAccountKey.json" assert { type: "json" };
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
+const db = admin.firestore();
+
+// ✅ Initialize Express
 const app = express();
-const PORT = process.env.PORT || 3000;
-
+app.use(cors());
 app.use(bodyParser.json());
 
-// Root check (to prevent 502 idle issues)
+// ✅ Root Test Endpoint
 app.get("/", (req, res) => {
-  res.send("Sacred MMO server is running! 🌌");
+  res.send("🔥 Sacred MMO Relay Server is LIVE 🔥");
 });
 
-// /sync endpoint - sends data to Firebase or your DB
-app.post("/sync", async (req, res) => {
-  try {
-    const data = req.body;
-    console.log("Incoming /sync data:", data);
-
-    // Example Firebase forward (replace URL with your real Firebase)
-    await fetch("https://your-firebase-url.firebaseio.com/logs.json", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-
-    res.status(200).json({ status: "success", received: data });
-  } catch (error) {
-    console.error("Error in /sync:", error);
-    res.status(500).json({ status: "error", message: error.message });
-  }
-});
-
-// /relay endpoint - parses event and forwards to /sync
+// ✅ Relay Endpoint (Logs to Console + Firebase)
 app.post("/relay", async (req, res) => {
+  const logEntry = req.body;
+
+  // 1️⃣ Log to Render Console
+  console.log("📥 Incoming Relay Log:", logEntry);
+
+  // 2️⃣ Respond immediately to ReqBin / client
+  res.status(200).json({
+    status: "success",
+    received: logEntry
+  });
+
+  // 3️⃣ Save to Firebase Firestore
   try {
-    const { player, action, type, realm } = req.body;
-    if (!player || !action) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
-
-    const formattedEvent = {
-      timestamp: new Date().toISOString(),
-      player,
-      action,
-      type: type || "MagicMoment",
-      realm: realm || "Sacred Realm",
-    };
-
-    // Forward internally to /sync
-    const response = await fetch(`http://localhost:${PORT}/sync`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(formattedEvent),
+    const docRef = db.collection("sacredLogs").doc();
+    await docRef.set({
+      ...logEntry,
+      timestamp: new Date().toISOString()
     });
-
-    const result = await response.json();
-    res.status(200).json({ status: "relayed", result });
+    console.log("✅ Saved to Firebase:", docRef.id);
   } catch (error) {
-    console.error("Error in /relay:", error);
-    res.status(500).json({ status: "error", message: error.message });
+    console.error("❌ Firebase Error:", error);
   }
 });
 
-// Start server
+// ✅ Start Server
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Sacred MMO server running on port ${PORT}`);
+  console.log(`🚀 Sacred MMO Relay running on port ${PORT}`);
 });
