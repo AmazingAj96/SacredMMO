@@ -4,11 +4,11 @@ import admin from "firebase-admin";
 const app = express();
 app.use(express.json());
 
-// 🔹 Decode Base64 JSON key
+// Decode Base64 JSON key
 const rawKey = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY_B64, "base64").toString("utf8");
 const serviceAccount = JSON.parse(rawKey);
 
-// 🔹 Fix private key formatting
+// Fix the private key formatting
 serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
 
 admin.initializeApp({
@@ -18,9 +18,9 @@ admin.initializeApp({
 
 const db = admin.database();
 
-// ==========================================
-// 🔹 1. Original /sync endpoint (works)
-// ==========================================
+// --------------------
+// Existing /sync endpoint
+// --------------------
 app.post("/sync", async (req, res) => {
   try {
     const { player, action, type } = req.body;
@@ -39,34 +39,33 @@ app.post("/sync", async (req, res) => {
   }
 });
 
-// ==========================================
-// 🔹 2. New /relay endpoint for MMO events
-// ==========================================
+// --------------------
+// New /relay endpoint (for MMO Auto Relay)
+// --------------------
 app.post("/relay", async (req, res) => {
   try {
-    const { message } = req.body; // e.g. "*joins Rick and Morty in Cloud Nine*"
-    if (!message) return res.status(400).json({ status: "error", error: "Missing message" });
+    const { message } = req.body;
 
-    const event = {
-      player: "Aj",
-      action: message,
-      type: "mmo_event",
+    const player = "Aj (Flamebearer)";
+    const action = message || "Unknown Action";
+
+    await db.ref("sacredLogs").push({
+      player,
+      action,
+      type: "mmo-event",
       timestamp: Date.now(),
-    };
+    });
 
-    await db.ref("sacredLogs").push(event);
-
-    console.log("🔥 ChatGPT MMO Event synced:", event);
-    res.json({ status: "ok", message: "Event relayed to Firebase!" });
+    res.json({ status: "ok", message: "Relayed to MMO server!" });
   } catch (error) {
     console.error("Relay error:", error);
     res.status(500).json({ status: "error", error: error.message });
   }
 });
 
-// ==========================================
-// 🔹 Start the server
-// ==========================================
+// --------------------
+// Server start
+// --------------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () =>
   console.log(`🔥 Sacred MMO Cloud running on ${PORT}`)
