@@ -2,29 +2,47 @@ import express from "express";
 import admin from "firebase-admin";
 
 const app = express();
-app.use(express.json()); // ✅ This ensures req.body is an object
+app.use(express.json());
 
-// Load JSON key from environment variable
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+// 1️⃣ Check environment variable first
+if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY_B64) {
+  console.error("❌ ERROR: FIREBASE_SERVICE_ACCOUNT_KEY_B64 is missing!");
+  process.exit(1); // Stop the server if the key is missing
+}
 
+// 2️⃣ Decode Base64 JSON key
+let serviceAccount;
+try {
+  const rawKey = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY_B64, "base64").toString("utf8");
+  serviceAccount = JSON.parse(rawKey);
+
+  // 3️⃣ Fix private key formatting
+  if (serviceAccount.private_key) {
+    serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+  } else {
+    console.error("❌ ERROR: private_key is missing in the service account JSON!");
+    process.exit(1);
+  }
+} catch (error) {
+  console.error("❌ Failed to parse Firebase key from Base64:", error);
+  process.exit(1);
+}
+
+// 4️⃣ Initialize Firebase Admin
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  databaseURL: "https://sacredsystemmmo-default-rtdb.firebaseio.com",
+  databaseURL: "https://sacredsystemmmo-default-rtdb.firebaseio.com"
 });
 
-const db = admin.database(); // ✅ Realtime Database
+const db = admin.database();
 
-// ✅ Cloud Sync Endpoint
+// 5️⃣ Endpoint to sync data
 app.post("/sync", async (req, res) => {
   try {
     const { player, action, type } = req.body;
 
-    // ✅ Check for missing values to avoid push errors
     if (!player || !action || !type) {
-      return res.status(400).json({
-        status: "error",
-        error: "Missing player, action, or type in request body",
-      });
+      return res.status(400).json({ status: "error", error: "Missing required fields" });
     }
 
     await db.ref("sacredLogs").push({
