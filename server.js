@@ -1,60 +1,59 @@
-const express = require("express");
-const cors = require("cors");
-const bodyParser = require("body-parser");
-const admin = require("firebase-admin");
-const path = require("path");
-const fs = require("fs");
+import express from "express";
+import admin from "firebase-admin";
 
-// ✅ Load Firebase service account key
-const serviceAccount = JSON.parse(
-  fs.readFileSync(path.join(__dirname, "serviceAccountKey.json"), "utf8")
-);
+const app = express();
+app.use(express.json());
 
+// Decode Base64 JSON key
+const rawKey = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY_B64, "base64").toString("utf8");
+const serviceAccount = JSON.parse(rawKey);
+
+// FIX the private key formatting
+serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+
+// Initialize Firebase Admin
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  databaseURL: "https://sacredsystemmmo-default-rtdb.firebaseio.com/"
+  databaseURL: "https://sacredsystemmmo-default-rtdb.firebaseio.com"
 });
 
 const db = admin.database();
 
-// ✅ Initialize Express
-const app = express();
-app.use(cors());
-app.use(bodyParser.json());
-
-// ✅ Root Test Endpoint
-app.get("/", (req, res) => {
-  res.send("🔥 Sacred MMO Relay Server (Realtime DB) is LIVE 🔥");
-});
-
-// ✅ Relay Endpoint (Logs to Console + Realtime DB)
-app.post("/relay", async (req, res) => {
-  const logEntry = req.body;
-
-  // 1️⃣ Log to Render Console
-  console.log("📥 Incoming Relay Log:", logEntry);
-
-  // 2️⃣ Respond immediately to ReqBin / client
-  res.status(200).json({
-    status: "success",
-    received: logEntry
-  });
-
-  // 3️⃣ Save to Realtime Database
+// ===============================
+// 🔹 /sync endpoint
+// ===============================
+app.post("/sync", async (req, res) => {
   try {
-    const ref = db.ref("sacredLogs").push(); // auto-generates unique key
-    await ref.set({
-      ...logEntry,
-      timestamp: new Date().toISOString()
+    const { player, action, type } = req.body;
+
+    // Push to Firebase
+    const ref = await db.ref("sacredLogs").push({
+      player,
+      action,
+      type,
+      timestamp: Date.now(),
     });
-    console.log("✅ Saved to Realtime DB:", ref.key);
+
+    console.log(`✅ Synced log from ${player}: ${action} (${type})`);
+
+    res.json({ status: "ok", message: "Synced to Realtime Database!", key: ref.key });
   } catch (error) {
-    console.error("❌ Firebase RTDB Error:", error);
+    console.error("❌ Error syncing:", error);
+    res.status(500).json({ status: "error", error: error.message });
   }
 });
 
-// ✅ Start Server
+// ===============================
+// 🔹 Auto Relay Listener
+// ===============================
+// Whenever a new sacred log is added, echo it to the console (can later relay to MMO grid)
+db.ref("sacredLogs").limitToLast(1).on("child_added", (snapshot) => {
+  const newLog = snapshot.val();
+  console.log(`🔔 Auto Relay: New Sacred Log ->`, newLog);
+});
+
+// ===============================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Sacred MMO Relay (Realtime DB) running on port ${PORT}`);
+  console.log(`🔥 Sacred MMO Cloud running on port ${PORT}`);
 });
