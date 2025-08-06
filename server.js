@@ -4,12 +4,10 @@ import admin from "firebase-admin";
 const app = express();
 app.use(express.json());
 
-// Decode Base64 JSON key
+// Decode and fix key before parsing
 const rawKey = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY_B64, "base64").toString("utf8");
-const serviceAccount = JSON.parse(rawKey);
-
-// FIX the private key formatting
-serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+const fixedRawKey = rawKey.replace(/\\n/g, '\n');
+const serviceAccount = JSON.parse(fixedRawKey);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
