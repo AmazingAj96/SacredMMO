@@ -7,10 +7,11 @@ import admin from "firebase-admin";
 import serviceAccount from "./serviceAccountKey.json" assert { type: "json" };
 
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
+  credential: admin.credential.cert(serviceAccount),
+  databaseURL: "https://sacredsystemmmo-default-rtdb.firebaseio.com/"
 });
 
-const db = admin.firestore();
+const db = admin.database();
 
 // ✅ Initialize Express
 const app = express();
@@ -19,10 +20,10 @@ app.use(bodyParser.json());
 
 // ✅ Root Test Endpoint
 app.get("/", (req, res) => {
-  res.send("🔥 Sacred MMO Relay Server is LIVE 🔥");
+  res.send("🔥 Sacred MMO Relay Server (Realtime DB) is LIVE 🔥");
 });
 
-// ✅ Relay Endpoint (Logs to Console + Firebase)
+// ✅ Relay Endpoint (Logs to Console + Realtime DB)
 app.post("/relay", async (req, res) => {
   const logEntry = req.body;
 
@@ -35,21 +36,21 @@ app.post("/relay", async (req, res) => {
     received: logEntry
   });
 
-  // 3️⃣ Save to Firebase Firestore
+  // 3️⃣ Save to Realtime Database
   try {
-    const docRef = db.collection("sacredLogs").doc();
-    await docRef.set({
+    const ref = db.ref("sacredLogs").push(); // auto-generates unique key
+    await ref.set({
       ...logEntry,
       timestamp: new Date().toISOString()
     });
-    console.log("✅ Saved to Firebase:", docRef.id);
+    console.log("✅ Saved to Realtime DB:", ref.key);
   } catch (error) {
-    console.error("❌ Firebase Error:", error);
+    console.error("❌ Firebase RTDB Error:", error);
   }
 });
 
 // ✅ Start Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Sacred MMO Relay running on port ${PORT}`);
+  console.log(`🚀 Sacred MMO Relay (Realtime DB) running on port ${PORT}`);
 });
