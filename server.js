@@ -1,68 +1,39 @@
-// =========================
-// SacredMMO Cloud Server.js
-// =========================
-
-const express = require('express');
-const bodyParser = require('body-parser');
-const cors = require('cors');
-const admin = require('firebase-admin');
+import express from "express";
+import admin from "firebase-admin";
 
 const app = express();
-app.use(cors());
-app.use(bodyParser.json());
+app.use(express.json());
 
-console.log("🚀 Sacred MMO Server starting...");
+// 1️⃣ Load JSON key from environment variable
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
 
-// -------------------------
-// Firebase Admin Setup
-// -------------------------
-const serviceAccount = JSON.parse(process.env.FIREBASE_KEY); 
-// <-- Stored as secret in Render
-
+// 2️⃣ Initialize Firebase Admin
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
+  databaseURL: "https://sacredsystemmmo.firebaseio.com" // replace if needed
 });
 
 const db = admin.firestore();
 
-// -------------------------
-// Sync Endpoint
-// -------------------------
-app.post('/sync', async (req, res) => {
-  const { player, action, type, timestamp } = req.body;
-  console.log("🔥 Sacred MMO Event:", req.body);
-
+// 3️⃣ Sync route for MMO events
+app.post("/sync", async (req, res) => {
   try {
-    // Save the event to Firestore
-    const event = {
+    const { player, action, type } = req.body;
+
+    // Save to Firestore
+    await db.collection("events").add({
       player,
       action,
-      type: type || "event",
-      timestamp: timestamp || Date.now(),
-      syncedAt: new Date().toISOString()
-    };
-
-    await db.collection('sacredEvents').add(event);
-
-    res.json({
-      success: true,
-      message: 'Sync stored in Firebase 🔥',
-      event
+      type,
+      timestamp: Date.now(),
     });
 
-  } catch (err) {
-    console.error("Firebase Error:", err);
-    res.status(500).json({
-      success: false,
-      error: 'Firebase write failed ❌'
-    });
+    res.json({ status: "ok", message: "Synced to Firestore!" });
+  } catch (error) {
+    console.error("Error syncing:", error);
+    res.status(500).json({ status: "error", error: error.message });
   }
 });
 
-// -------------------------
-// Server Start
-// -------------------------
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🌐 Sacred MMO Cloud Server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`🔥 Sacred MMO Cloud running on ${PORT}`));
