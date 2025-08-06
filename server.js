@@ -1,10 +1,14 @@
-import express from "express";
-import cors from "cors";
-import bodyParser from "body-parser";
-import admin from "firebase-admin";
+const express = require("express");
+const cors = require("cors");
+const bodyParser = require("body-parser");
+const admin = require("firebase-admin");
+const path = require("path");
+const fs = require("fs");
 
-// ✅ Initialize Firebase Admin
-import serviceAccount from "./serviceAccountKey.json" assert { type: "json" };
+// ✅ Load Firebase service account key
+const serviceAccount = JSON.parse(
+  fs.readFileSync(path.join(__dirname, "serviceAccountKey.json"), "utf8")
+);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
