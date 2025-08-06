@@ -4,19 +4,23 @@ import admin from "firebase-admin";
 const app = express();
 app.use(express.json());
 
-// 🔹 Decode Firebase key from Base64 environment variable
+// Load the Base64 environment variable and decode it
+if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY_B64) {
+  console.error("❌ Missing FIREBASE_SERVICE_ACCOUNT_KEY_B64 environment variable");
+}
 const serviceAccount = JSON.parse(
-  Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY, "base64").toString()
+  Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY_B64, "base64").toString("utf8")
 );
 
+// Initialize Firebase Admin
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  databaseURL: "https://sacredsystemmmo-default-rtdb.firebaseio.com",
+  databaseURL: "https://sacredsystemmmo-default-rtdb.firebaseio.com"
 });
 
-const db = admin.database(); // ✅ Realtime Database
+const db = admin.database();
 
-// 🔹 Endpoint to sync data
+// 🔹 Sync endpoint
 app.post("/sync", async (req, res) => {
   try {
     const { player, action, type } = req.body;
@@ -35,7 +39,13 @@ app.post("/sync", async (req, res) => {
   }
 });
 
-// 🔹 Start server
+// 🔹 Debug route to confirm environment variable is working
+app.get("/debug-env", (req, res) => {
+  const key = process.env.FIREBASE_SERVICE_ACCOUNT_KEY_B64;
+  if (!key) return res.status(500).send("❌ Env variable not found!");
+  res.send(`✅ Env variable loaded! Length: ${key.length} characters`);
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () =>
   console.log(`🔥 Sacred MMO Cloud running on ${PORT}`)
