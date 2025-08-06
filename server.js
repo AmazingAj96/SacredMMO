@@ -1,65 +1,68 @@
 import express from "express";
-import admin from "firebase-admin";
+import cors from "cors";
 
 const app = express();
-app.use(express.json());
+const PORT = process.env.PORT || 10000;
 
-// 1️⃣ Check environment variable first
-if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY_B64) {
-  console.error("❌ ERROR: FIREBASE_SERVICE_ACCOUNT_KEY_B64 is missing!");
-  process.exit(1); // Stop the server if the key is missing
-}
+app.use(cors());
+app.use(express.json({ limit: "1mb" })); // Safe JSON parsing
 
-// 2️⃣ Decode Base64 JSON key
-let serviceAccount;
-try {
-  const rawKey = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY_B64, "base64").toString("utf8");
-  serviceAccount = JSON.parse(rawKey);
-
-  // 3️⃣ Fix private key formatting
-  if (serviceAccount.private_key) {
-    serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-  } else {
-    console.error("❌ ERROR: private_key is missing in the service account JSON!");
-    process.exit(1);
-  }
-} catch (error) {
-  console.error("❌ Failed to parse Firebase key from Base64:", error);
-  process.exit(1);
-}
-
-// 4️⃣ Initialize Firebase Admin
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-  databaseURL: "https://sacredsystemmmo-default-rtdb.firebaseio.com"
+// Health check
+app.get("/", (req, res) => {
+  res.send("🔥 Sacred MMO Server is ALIVE 🔥");
 });
 
-const db = admin.database();
-
-// 5️⃣ Endpoint to sync data
-app.post("/sync", async (req, res) => {
+// Core MMO Sync
+app.post("/sync", (req, res) => {
   try {
-    const { player, action, type } = req.body;
+    console.log("Incoming raw body:", req.body);
 
-    if (!player || !action || !type) {
-      return res.status(400).json({ status: "error", error: "Missing required fields" });
+    // Decode if needed
+    let data = req.body;
+    if (typeof data === "string") {
+      try {
+        data = JSON.parse(data);
+      } catch (err) {
+        console.error("JSON parse error:", err.message);
+        return res.status(400).json({ 
+          status: "error", 
+          message: "Invalid JSON format", 
+          raw: req.body 
+        });
+      }
     }
 
-    await db.ref("sacredLogs").push({
-      player,
-      action,
-      type,
-      timestamp: Date.now(),
+    const { player, action, type, realm } = data;
+
+    if (!player || !action || !type || !realm) {
+      console.error("Missing fields:", data);
+      return res.status(400).json({ 
+        status: "error", 
+        message: "Missing required fields", 
+        received: data 
+      });
+    }
+
+    // Sacred MMO log
+    console.log("Sacred Log Received:", data);
+
+    // ✅ Always respond to avoid timeout
+    return res.status(200).json({
+      status: "success",
+      message: "Sacred log received",
+      received: data
     });
 
-    res.json({ status: "ok", message: "Synced to Realtime Database!" });
-  } catch (error) {
-    console.error("Error syncing:", error);
-    res.status(500).json({ status: "error", error: error.message });
+  } catch (err) {
+    console.error("Server error:", err);
+    return res.status(500).json({
+      status: "error",
+      message: "Internal server crash prevented",
+      details: err.message
+    });
   }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () =>
-  console.log(`🔥 Sacred MMO Cloud running on ${PORT}`)
-);
+app.listen(PORT, () => {
+  console.log(`🔥 Sacred MMO Server running on ${PORT} 🔥`);
+});
